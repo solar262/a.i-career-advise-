@@ -1,11 +1,9 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState } from 'react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
-import { AnalysisType, PredictionResult, RoiForecastResult, SkillGapsResult, DevPlanResult, Skill, ChatMessage } from '../types';
+import { AnalysisType, PredictionResult, RoiForecastResult, SkillGapsResult, DevPlanResult, Skill } from '../types';
 import DataChart from './DataChart';
 import { ArrowTrendingUpIcon, LightBulbIcon, ClipboardDocumentListIcon, CheckCircleIcon, DocumentArrowDownIcon, LogoIcon } from './IconComponents';
-import { startChatSession } from '../services/geminiService';
-import type { Chat } from '@google/genai';
 import InteractiveChat from './InteractiveChat';
 
 interface PredictionResultDisplayProps {
@@ -136,18 +134,7 @@ const renderDevPlan = (data: DevPlanResult) => (
 const PredictionResultDisplay: React.FC<PredictionResultDisplayProps> = ({ result, type }) => {
   const pdfRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
-  const [chatSession, setChatSession] = useState<Chat | null>(null);
-
-  useEffect(() => {
-    if (result && type) {
-      const session = startChatSession(type, result);
-      setChatSession(session);
-    }
-    // This effect should run only when the result/type changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [result, type]);
-
-
+  
   const handleExportPdf = () => {
     const input = pdfRef.current;
     if (!input) {
@@ -214,6 +201,10 @@ const PredictionResultDisplay: React.FC<PredictionResultDisplayProps> = ({ resul
     }
   };
 
+  const systemInstruction = result 
+    ? `You are an expert AI analyst named Aura. The user has just generated the following '${type}' report. Your task is to answer follow-up questions they might have about this specific data. Be helpful, concise, and always refer to the report context. Here is the report data: ${JSON.stringify(result)}`
+    : '';
+
   return (
     <div className="w-full max-w-4xl mx-auto animate-fade-in relative">
         <button
@@ -246,9 +237,9 @@ const PredictionResultDisplay: React.FC<PredictionResultDisplayProps> = ({ resul
               {renderContent()}
             </div>
             
-            {chatSession && (
+            {result && type && (
                 <div className="mt-8 pt-6 border-t border-brand-border">
-                    <InteractiveChat chatSession={chatSession} />
+                    <InteractiveChat systemInstruction={systemInstruction} />
                 </div>
             )}
         </div>

@@ -1,21 +1,32 @@
 import React, { useState, useRef, useEffect } from 'react';
-import type { Chat } from '@google/genai';
-import { continueChatStream } from '../services/geminiService';
+import { Chat } from '@google/genai';
+import { startChat } from '../services/geminiService';
 import { ChatMessage } from '../types';
 import { LogoIcon, PaperAirplaneIcon } from './IconComponents';
 
 interface InteractiveChatProps {
-    chatSession: Chat;
+    systemInstruction: string;
 }
 
-const InteractiveChat: React.FC<InteractiveChatProps> = ({ chatSession }) => {
+const InteractiveChat: React.FC<InteractiveChatProps> = ({ systemInstruction }) => {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
+    const [chat, setChat] = useState<Chat | null>(null);
     const [userInput, setUserInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const chatContainerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
+        // When the system instruction changes (i.e., a new report is generated),
+        // create a new stateful chat session.
+        if (systemInstruction) {
+            setChat(startChat(systemInstruction));
+            setMessages([]);
+        }
+    }, [systemInstruction]);
+
+    useEffect(() => {
+        // Auto-scroll to the latest message
         if (chatContainerRef.current) {
             chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
         }
@@ -23,25 +34,29 @@ const InteractiveChat: React.FC<InteractiveChatProps> = ({ chatSession }) => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!userInput.trim() || isLoading) return;
+        if (!userInput.trim() || isLoading || !chat) return;
 
         const newUserMessage: ChatMessage = {
             role: 'user',
             parts: [{ text: userInput }],
         };
+        
+        const currentInput = userInput;
         setMessages(prev => [...prev, newUserMessage]);
         setUserInput('');
         setIsLoading(true);
         setError(null);
 
         try {
-            const stream = await continueChatStream(chatSession, userInput);
+            const stream = await chat.sendMessageStream({ message: currentInput });
             
             let modelResponse = '';
+            // Add a placeholder for the model's response to the message list
             setMessages(prev => [...prev, { role: 'model', parts: [{ text: '' }] }]);
 
             for await (const chunk of stream) {
                 modelResponse += chunk.text;
+                // Update the last message in the list (the model's response) with the new text
                 setMessages(prev => {
                     const newMessages = [...prev];
                     newMessages[newMessages.length - 1].parts[0].text = modelResponse;
@@ -50,7 +65,13 @@ const InteractiveChat: React.FC<InteractiveChatProps> = ({ chatSession }) => {
             }
 
         } catch (err) {
-            setError('Sorry, something went wrong. Please try again.');
+            const errorMessage = 'Sorry, something went wrong. Please try again.';
+            setError(errorMessage);
+            // Replace the model's response placeholder with an error message
+            setMessages(prev => {
+                const newMessages = [...prev.slice(0, -1)]; // Remove placeholder
+                return [...newMessages, { role: 'model', parts: [{ text: errorMessage }] }];
+            });
             console.error(err);
         } finally {
             setIsLoading(false);
@@ -91,7 +112,7 @@ const InteractiveChat: React.FC<InteractiveChatProps> = ({ chatSession }) => {
                  )}
             </div>
 
-            {error && <p className="text-red-400 text-sm mt-2">{error}</p>}
+            {error && !isLoading && <p className="text-red-400 text-sm mt-2 text-center">{error}</p>}
 
             <form onSubmit={handleSubmit} className="mt-4 flex items-center gap-3">
                 <input

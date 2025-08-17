@@ -14,7 +14,7 @@ export interface Employee {
 export interface Company {
   id: number;
   name: string;
-  logo: React.ReactNode;
+  logoId: string;
   employees: Employee[];
 }
 

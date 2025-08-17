@@ -190,26 +190,12 @@ export const refineTextWithAI = async (textToRefine: string, context: RefineCont
 
 // --- CHAT FUNCTIONALITY ---
 
-export const startChatSession = (analysisType: AnalysisType, reportData: PredictionResult): Chat => {
-    const systemInstruction = `You are an expert AI analyst named Aura. The user has just generated the following '${analysisType}' report. Your task is to answer follow-up questions they might have about this specific data. Be helpful, concise, and always refer to the report context. Here is the report data: ${JSON.stringify(reportData)}`;
-
-    const chat = ai.chats.create({
+export const startChat = (systemInstruction: string): Chat => {
+    return ai.chats.create({
         model,
         config: {
             systemInstruction,
             temperature: 0.7,
         },
-        history: [],
     });
-    return chat;
-};
-
-export const continueChatStream = async (chat: Chat, message: string) => {
-    try {
-        const result = await chat.sendMessageStream({ message });
-        return result;
-    } catch (error) {
-        console.error("Error in continueChatStream:", error);
-        throw new Error("Failed to get response from AI.");
-    }
 };

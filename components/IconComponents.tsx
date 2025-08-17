@@ -103,12 +103,25 @@ export const UserPlusIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => 
 
 
 // Mock Company Logos
-export const CompanyIconA: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+const CompanyIconA: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path></svg>
 );
-export const CompanyIconB: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+const CompanyIconB: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}><path d="M3 12l9-9 9 9-9 9-9-9zm9 5.25V12m0-5.25V12m0 0H6.75M12 12h5.25" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path></svg>
 );
-export const CompanyIconC: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+const CompanyIconC: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}><path d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zm0 2.25a2.25 2.25 0 100 4.5 2.25 2.25 0 000-4.5zm0 15a7.5 7.5 0 01-7.5-7.5h15a7.5 7.5 0 01-7.5 7.5z" fill="#f472b6"></path></svg>
 );
+
+export const getCompanyLogoById = (logoId: string, props: React.SVGProps<SVGSVGElement>) => {
+    switch (logoId) {
+        case 'CompanyIconA':
+            return <CompanyIconA {...props} />;
+        case 'CompanyIconB':
+            return <CompanyIconB {...props} />;
+        case 'CompanyIconC':
+            return <CompanyIconC {...props} />;
+        default:
+            return <BuildingOfficeIcon {...props} />;
+    }
+};

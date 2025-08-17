@@ -1,15 +1,37 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { AnalysisType, PredictionResult, Employee, Company } from '../types';
 import { MOCK_COMPANIES } from '../constants';
 import { generatePrediction, refineTextWithAI, RefineContext } from '../services/geminiService';
 import PredictionResultDisplay from './PredictionResultDisplay';
 import LoadingSpinner from './LoadingSpinner';
 import EmployeeManagementModal from './EmployeeManagementModal';
-import { ChartBarIcon, LightBulbIcon, UserGroupIcon, SparklesIcon, BuildingOfficeIcon, ChevronDownIcon, LogoIcon } from './IconComponents';
+import { ChartBarIcon, LightBulbIcon, UserGroupIcon, SparklesIcon, ChevronDownIcon, LogoIcon, getCompanyLogoById } from './IconComponents';
+
+const LOCAL_STORAGE_KEY = 'aura-enterprise-data';
+
+// Load initial state from localStorage or seed with mock data
+const loadCompaniesFromStorage = (): Company[] => {
+  try {
+    const storedData = window.localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (storedData) {
+      // Basic validation to ensure it's an array
+      const parsedData = JSON.parse(storedData);
+      if (Array.isArray(parsedData) && parsedData.length > 0) {
+        return parsedData;
+      }
+    }
+  } catch (error) {
+    console.error("Failed to parse companies from localStorage", error);
+  }
+  // If nothing in storage or data is invalid, seed with mock data
+  window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(MOCK_COMPANIES));
+  return MOCK_COMPANIES;
+};
+
 
 const Dashboard: React.FC = () => {
-  const [companies, setCompanies] = useState<Company[]>(MOCK_COMPANIES);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<number>(MOCK_COMPANIES[0].id);
+  const [companies, setCompanies] = useState<Company[]>(loadCompaniesFromStorage);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<number>(companies[0].id);
 
   const [selectedAnalysis, setSelectedAnalysis] = useState<AnalysisType | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -18,6 +40,15 @@ const Dashboard: React.FC = () => {
   const [predictionResult, setPredictionResult] = useState<PredictionResult>(null);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Effect to save companies to localStorage whenever they change
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(companies));
+    } catch (error) {
+      console.error("Failed to save companies to localStorage", error);
+    }
+  }, [companies]);
 
   const selectedCompany = useMemo(() => 
     companies.find(c => c.id === selectedCompanyId) || companies[0],
@@ -29,18 +60,23 @@ const Dashboard: React.FC = () => {
   const [departmentDescription, setDepartmentDescription] = useState('');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>(selectedCompany.employees[0]?.id.toString() || '');
   const [careerGoals, setCareerGoals] = useState('');
+  
+  // Effect to reset selected employee when company changes
+  useEffect(() => {
+    const company = companies.find(c => c.id === selectedCompanyId);
+    if (company && company.employees.length > 0) {
+      setSelectedEmployeeId(company.employees[0].id.toString());
+    } else {
+      setSelectedEmployeeId('');
+    }
+  }, [selectedCompanyId, companies]);
+
 
   const handleCompanyChange = (companyId: number) => {
     setSelectedCompanyId(companyId);
     setPredictionResult(null);
     setError(null);
     setSelectedAnalysis(null);
-    const newCompany = companies.find(c => c.id === companyId);
-    if (newCompany && newCompany.employees.length > 0) {
-      setSelectedEmployeeId(newCompany.employees[0].id.toString());
-    } else {
-      setSelectedEmployeeId('');
-    }
   };
 
   const handleAnalysisSelection = (type: AnalysisType) => {
@@ -277,7 +313,7 @@ const Dashboard: React.FC = () => {
             <div className='relative'>
                 <label htmlFor="company-select" className='sr-only'>Select Company</label>
                 <div className='flex items-center space-x-2 bg-brand-secondary/50 border border-brand-border rounded-md pl-3'>
-                    {selectedCompany.logo}
+                    {getCompanyLogoById(selectedCompany.logoId, { className: "w-6 h-6" })}
                     <select
                         id="company-select"
                         value={selectedCompanyId}
@@ -315,7 +351,6 @@ const Dashboard: React.FC = () => {
              className={`p-6 rounded-lg border text-left transition-all duration-300 transform hover:-translate-y-1 group relative overflow-hidden ${
                selectedAnalysis === option.type 
                ? 'bg-brand-secondary/80 border-brand-accent shadow-2xl shadow-brand-accent/20 animate-glow' 
-               //? 'bg-brand-secondary/80 border-brand-accent ring-2 ring-brand-accent shadow-2xl shadow-brand-accent/20' 
                : 'bg-brand-secondary/50 border-brand-border hover:border-brand-accent/50'
              } backdrop-blur-sm`}
            >

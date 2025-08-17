@@ -1,12 +1,10 @@
-import React from 'react';
 import { Company } from './types';
-import { CompanyIconA, CompanyIconB, CompanyIconC } from './components/IconComponents';
 
 export const MOCK_COMPANIES: Company[] = [
   { 
     id: 1, 
     name: 'Innovate Corp',
-    logo: React.createElement(CompanyIconA, { className: "w-6 h-6" }),
+    logoId: 'CompanyIconA',
     employees: [
       { id: 1, name: 'Alice Johnson', role: 'Software Engineer II', department: 'Engineering' },
       { id: 2, name: 'Bob Williams', role: 'Senior Product Manager', department: 'Product' },
@@ -16,7 +14,7 @@ export const MOCK_COMPANIES: Company[] = [
   { 
     id: 2, 
     name: 'Quantum Solutions', 
-    logo: React.createElement(CompanyIconB, { className: "w-6 h-6" }),
+    logoId: 'CompanyIconB',
     employees: [
       { id: 4, name: 'Diana Prince', role: 'UX/UI Designer', department: 'Design' },
       { id: 5, name: 'Ethan Hunt', role: 'Sales Executive', department: 'Sales' },
@@ -26,7 +24,7 @@ export const MOCK_COMPANIES: Company[] = [
     { 
     id: 3, 
     name: 'Starlight Ventures',
-    logo: React.createElement(CompanyIconC, { className: "w-6 h-6" }),
+    logoId: 'CompanyIconC',
     employees: [
       { id: 7, name: 'George Costanza', role: 'Architect', department: 'Real Estate' },
       { id: 8, name: 'Heidi Klum', role: 'Lead Designer', department: 'Fashion' },
