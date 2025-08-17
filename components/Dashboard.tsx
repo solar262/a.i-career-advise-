@@ -1,23 +1,47 @@
-import React, { useState, useCallback } from 'react';
-import { AnalysisType, PredictionResult, Employee, RoiForecastResult, SkillGapsResult, DevPlanResult } from '../types';
-import { MOCK_EMPLOYEES } from '../constants';
+import React, { useState, useCallback, useMemo } from 'react';
+import { AnalysisType, PredictionResult, Employee, Company } from '../types';
+import { MOCK_COMPANIES } from '../constants';
 import { generatePrediction, refineTextWithAI, RefineContext } from '../services/geminiService';
 import PredictionResultDisplay from './PredictionResultDisplay';
 import LoadingSpinner from './LoadingSpinner';
-import { ChartBarIcon, LightBulbIcon, UserGroupIcon, SparklesIcon } from './IconComponents';
+import EmployeeManagementModal from './EmployeeManagementModal';
+import { ChartBarIcon, LightBulbIcon, UserGroupIcon, SparklesIcon, BuildingOfficeIcon, ChevronDownIcon, LogoIcon } from './IconComponents';
 
 const Dashboard: React.FC = () => {
+  const [companies, setCompanies] = useState<Company[]>(MOCK_COMPANIES);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<number>(MOCK_COMPANIES[0].id);
+
   const [selectedAnalysis, setSelectedAnalysis] = useState<AnalysisType | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isRefining, setIsRefining] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [predictionResult, setPredictionResult] = useState<PredictionResult>(null);
 
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const selectedCompany = useMemo(() => 
+    companies.find(c => c.id === selectedCompanyId) || companies[0],
+    [companies, selectedCompanyId]
+  );
+  
   // Input states
   const [initiativeDescription, setInitiativeDescription] = useState('');
   const [departmentDescription, setDepartmentDescription] = useState('');
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>(MOCK_EMPLOYEES[0].id.toString());
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>(selectedCompany.employees[0]?.id.toString() || '');
   const [careerGoals, setCareerGoals] = useState('');
+
+  const handleCompanyChange = (companyId: number) => {
+    setSelectedCompanyId(companyId);
+    setPredictionResult(null);
+    setError(null);
+    setSelectedAnalysis(null);
+    const newCompany = companies.find(c => c.id === companyId);
+    if (newCompany && newCompany.employees.length > 0) {
+      setSelectedEmployeeId(newCompany.employees[0].id.toString());
+    } else {
+      setSelectedEmployeeId('');
+    }
+  };
 
   const handleAnalysisSelection = (type: AnalysisType) => {
     setSelectedAnalysis(type);
@@ -32,11 +56,11 @@ const Dashboard: React.FC = () => {
       case AnalysisType.SKILL_GAPS:
         return departmentDescription.trim().length > 5;
       case AnalysisType.DEV_PLAN:
-        return selectedEmployeeId && careerGoals.trim().length > 10;
+        return selectedEmployeeId && careerGoals.trim().length > 10 && selectedCompany.employees.length > 0;
       default:
         return false;
     }
-  }, [selectedAnalysis, initiativeDescription, departmentDescription, selectedEmployeeId, careerGoals]);
+  }, [selectedAnalysis, initiativeDescription, departmentDescription, selectedEmployeeId, careerGoals, selectedCompany]);
 
   const handleRefine = async (context: RefineContext) => {
     let textToRefine: string;
@@ -89,7 +113,7 @@ const Dashboard: React.FC = () => {
         context = { departmentDescription };
         break;
       case AnalysisType.DEV_PLAN:
-        const employee = MOCK_EMPLOYEES.find(emp => emp.id === parseInt(selectedEmployeeId, 10));
+        const employee = selectedCompany.employees.find(emp => emp.id.toString() === selectedEmployeeId);
         context = { employee, goals: careerGoals };
         break;
     }
@@ -103,6 +127,20 @@ const Dashboard: React.FC = () => {
       setPredictionResult(result as PredictionResult);
     }
     setIsLoading(false);
+  };
+  
+  // Employee CRUD operations
+  const handleUpdateEmployees = (updatedEmployees: Employee[]) => {
+    const updatedCompanies = companies.map(c => 
+      c.id === selectedCompanyId ? { ...c, employees: updatedEmployees } : c
+    );
+    setCompanies(updatedCompanies);
+     // If the currently selected employee was deleted, reset to the first one
+     if (!updatedEmployees.some(e => e.id.toString() === selectedEmployeeId) && updatedEmployees.length > 0) {
+      setSelectedEmployeeId(updatedEmployees[0].id.toString());
+    } else if (updatedEmployees.length === 0) {
+      setSelectedEmployeeId('');
+    }
   };
 
   const RefineButton: React.FC<{ context: RefineContext, hasText: boolean }> = ({ context, hasText }) => (
@@ -171,10 +209,15 @@ const Dashboard: React.FC = () => {
                 value={selectedEmployeeId}
                 onChange={(e) => setSelectedEmployeeId(e.target.value)}
                 className="w-full bg-brand-primary border border-brand-border rounded-md p-3 text-brand-text-primary focus:ring-2 focus:ring-brand-accent focus:outline-none transition"
+                disabled={selectedCompany.employees.length === 0}
               >
-                {MOCK_EMPLOYEES.map(emp => (
-                  <option key={emp.id} value={emp.id}>{emp.name} - {emp.role}</option>
-                ))}
+                {selectedCompany.employees.length > 0 ? (
+                    selectedCompany.employees.map(emp => (
+                      <option key={emp.id} value={emp.id}>{emp.name} - {emp.role}</option>
+                    ))
+                ) : (
+                    <option>No employees found for this company.</option>
+                )}
               </select>
             </div>
             <div className="relative">
@@ -211,6 +254,53 @@ const Dashboard: React.FC = () => {
   ];
 
   return (
+    <>
+    <EmployeeManagementModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        company={selectedCompany}
+        onSave={handleUpdateEmployees}
+    />
+    <header className="bg-brand-primary/80 backdrop-blur-sm sticky top-0 z-50 border-b border-brand-border mb-8">
+      <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+            <LogoIcon className="w-8 h-8 text-brand-accent" />
+            <div>
+              <h1 className="text-xl font-bold text-brand-text-primary tracking-tight">
+                Aura
+              </h1>
+              <p className="text-xs text-brand-text-secondary">Predictive Training Intelligence</p>
+            </div>
+        </div>
+
+        <div className='flex items-center space-x-4'>
+            <div className='relative'>
+                <label htmlFor="company-select" className='sr-only'>Select Company</label>
+                <div className='flex items-center space-x-2 bg-brand-secondary/50 border border-brand-border rounded-md pl-3'>
+                    {selectedCompany.logo}
+                    <select
+                        id="company-select"
+                        value={selectedCompanyId}
+                        onChange={(e) => handleCompanyChange(Number(e.target.value))}
+                        className="bg-transparent text-brand-text-primary font-semibold py-2 pr-8 focus:outline-none appearance-none"
+                    >
+                        {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                     <ChevronDownIcon className="w-5 h-5 text-brand-text-secondary absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+            </div>
+
+            <button
+                onClick={() => setIsModalOpen(true)}
+                className="flex items-center space-x-2 bg-brand-secondary text-brand-text-primary font-semibold py-2 px-4 rounded-md border border-brand-border hover:bg-brand-secondary/80 transition-colors"
+            >
+                <UserGroupIcon className="w-5 h-5" />
+                <span>Manage Employees</span>
+            </button>
+        </div>
+
+      </div>
+    </header>
     <div className="flex flex-col items-center">
       <h2 className="text-3xl md:text-4xl font-bold text-center text-brand-text-primary">Welcome to the Predictive BI Dashboard</h2>
       <p className="mt-2 text-lg text-brand-text-secondary text-center max-w-2xl">
@@ -225,6 +315,7 @@ const Dashboard: React.FC = () => {
              className={`p-6 rounded-lg border text-left transition-all duration-300 transform hover:-translate-y-1 group relative overflow-hidden ${
                selectedAnalysis === option.type 
                ? 'bg-brand-secondary/80 border-brand-accent shadow-2xl shadow-brand-accent/20 animate-glow' 
+               //? 'bg-brand-secondary/80 border-brand-accent ring-2 ring-brand-accent shadow-2xl shadow-brand-accent/20' 
                : 'bg-brand-secondary/50 border-brand-border hover:border-brand-accent/50'
              } backdrop-blur-sm`}
            >
@@ -248,6 +339,7 @@ const Dashboard: React.FC = () => {
         )}
       </div>
     </div>
+    </>
   );
 };
 

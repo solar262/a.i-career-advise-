@@ -11,6 +11,14 @@ export interface Employee {
   department: string;
 }
 
+export interface Company {
+  id: number;
+  name: string;
+  logo: React.ReactNode;
+  employees: Employee[];
+}
+
+
 // ROI Forecast Types
 export interface QuarterlyImpact {
   quarter: string;
@@ -53,3 +61,9 @@ export interface DevPlanResult {
 }
 
 export type PredictionResult = RoiForecastResult | SkillGapsResult | DevPlanResult | null;
+
+// Chat Types
+export interface ChatMessage {
+    role: 'user' | 'model';
+    parts: { text: string }[];
+}

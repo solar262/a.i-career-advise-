@@ -1,9 +1,12 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
-import { AnalysisType, PredictionResult, RoiForecastResult, SkillGapsResult, DevPlanResult, Skill } from '../types';
+import { AnalysisType, PredictionResult, RoiForecastResult, SkillGapsResult, DevPlanResult, Skill, ChatMessage } from '../types';
 import DataChart from './DataChart';
 import { ArrowTrendingUpIcon, LightBulbIcon, ClipboardDocumentListIcon, CheckCircleIcon, DocumentArrowDownIcon, LogoIcon } from './IconComponents';
+import { startChatSession } from '../services/geminiService';
+import type { Chat } from '@google/genai';
+import InteractiveChat from './InteractiveChat';
 
 interface PredictionResultDisplayProps {
   result: PredictionResult;
@@ -133,6 +136,17 @@ const renderDevPlan = (data: DevPlanResult) => (
 const PredictionResultDisplay: React.FC<PredictionResultDisplayProps> = ({ result, type }) => {
   const pdfRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [chatSession, setChatSession] = useState<Chat | null>(null);
+
+  useEffect(() => {
+    if (result && type) {
+      const session = startChatSession(type, result);
+      setChatSession(session);
+    }
+    // This effect should run only when the result/type changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result, type]);
+
 
   const handleExportPdf = () => {
     const input = pdfRef.current;
@@ -218,17 +232,25 @@ const PredictionResultDisplay: React.FC<PredictionResultDisplayProps> = ({ resul
           )}
         </button>
 
-        <div ref={pdfRef} className="bg-brand-secondary p-8 rounded-lg border border-brand-border shadow-lg">
-            <div className="flex items-start space-x-4 mb-6 pb-4 border-b border-brand-border">
-                <LogoIcon className="w-10 h-10 text-brand-accent flex-shrink-0" />
-                <div>
-                    <h1 className="text-xl font-bold text-brand-text-primary tracking-tight">
-                        Aura: Predictive Training Intelligence
-                    </h1>
-                    <p className="text-md text-brand-text-secondary">{getTitle()}</p>
-                </div>
+        <div className="bg-brand-secondary p-8 rounded-lg border border-brand-border shadow-lg">
+            <div ref={pdfRef}>
+              <div className="flex items-start space-x-4 mb-6 pb-4 border-b border-brand-border">
+                  <LogoIcon className="w-10 h-10 text-brand-accent flex-shrink-0" />
+                  <div>
+                      <h1 className="text-xl font-bold text-brand-text-primary tracking-tight">
+                          Aura: Predictive Training Intelligence
+                      </h1>
+                      <p className="text-md text-brand-text-secondary">{getTitle()}</p>
+                  </div>
+              </div>
+              {renderContent()}
             </div>
-            {renderContent()}
+            
+            {chatSession && (
+                <div className="mt-8 pt-6 border-t border-brand-border">
+                    <InteractiveChat chatSession={chatSession} />
+                </div>
+            )}
         </div>
     </div>
   );
