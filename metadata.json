@@ -1,0 +1,5 @@
+{
+  "name": "Aura: Predictive Training Intelligence",
+  "description": "An AI-powered dashboard to forecast training ROI, identify future skill gaps, and generate personalized development plans for employees, leveraging Google's Gemini API for predictive insights.",
+  "requestFramePermissions": []
+}
