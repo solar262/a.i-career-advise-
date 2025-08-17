@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Chat } from '@google/genai';
-import { startChat } from '../services/geminiService';
+import { getChatStream } from '../services/geminiService';
 import { ChatMessage } from '../types';
 import { LogoIcon, PaperAirplaneIcon } from './IconComponents';
 
@@ -10,45 +9,18 @@ interface InteractiveChatProps {
 
 const InteractiveChat: React.FC<InteractiveChatProps> = ({ systemInstruction }) => {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
-    const [chat, setChat] = useState<Chat | null>(null);
     const [userInput, setUserInput] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(true); // Start in a loading state until the AI sends its greeting
     const [error, setError] = useState<string | null>(null);
     const chatContainerRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        // When the system instruction changes (i.e., a new report is generated),
-        // create a new stateful chat session.
-        if (systemInstruction) {
-            setChat(startChat(systemInstruction));
-            setMessages([]);
-        }
-    }, [systemInstruction]);
-
-    useEffect(() => {
-        // Auto-scroll to the latest message
-        if (chatContainerRef.current) {
-            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-        }
-    }, [messages]);
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!userInput.trim() || isLoading || !chat) return;
-
-        const newUserMessage: ChatMessage = {
-            role: 'user',
-            parts: [{ text: userInput }],
-        };
-        
-        const currentInput = userInput;
-        setMessages(prev => [...prev, newUserMessage]);
-        setUserInput('');
+    // This function handles the streaming logic for any given chat history
+    const streamResponse = async (history: ChatMessage[]) => {
         setIsLoading(true);
         setError(null);
 
         try {
-            const stream = await chat.sendMessageStream({ message: currentInput });
+            const stream = await getChatStream(systemInstruction, history);
             
             let modelResponse = '';
             // Add a placeholder for the model's response to the message list
@@ -56,11 +28,15 @@ const InteractiveChat: React.FC<InteractiveChatProps> = ({ systemInstruction }) 
 
             for await (const chunk of stream) {
                 modelResponse += chunk.text;
-                // Update the last message in the list (the model's response) with the new text
+                // IMMUTABLE UPDATE: Update the last message (the model's response) with the new text.
                 setMessages(prev => {
-                    const newMessages = [...prev];
-                    newMessages[newMessages.length - 1].parts[0].text = modelResponse;
-                    return newMessages;
+                    const lastMessage = prev[prev.length - 1];
+                    if (lastMessage?.role === 'model') {
+                        // Create a new message object instead of mutating the existing one.
+                        const updatedLastMessage = { ...lastMessage, parts: [{ text: modelResponse }] };
+                        return [...prev.slice(0, -1), updatedLastMessage];
+                    }
+                    return prev;
                 });
             }
 
@@ -77,6 +53,47 @@ const InteractiveChat: React.FC<InteractiveChatProps> = ({ systemInstruction }) 
             setIsLoading(false);
         }
     };
+    
+    useEffect(() => {
+        // When a new report is generated (systemInstruction changes),
+        // reset the chat and have the AI send an initial greeting.
+        if (systemInstruction) {
+            const initialPrompt: ChatMessage[] = [{
+                role: 'user',
+                parts: [{ text: "Hello! Please briefly introduce yourself as Aura, the AI analyst, and confirm that you're ready to answer questions about the report I've just generated." }],
+            }];
+            
+            // Clear previous messages and start the new conversation.
+            setMessages([]);
+            // The initial prompt is not displayed to the user.
+            streamResponse(initialPrompt);
+        }
+        // This effect should only run when systemInstruction changes.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [systemInstruction]);
+
+    useEffect(() => {
+        // Auto-scroll to the latest message
+        if (chatContainerRef.current) {
+            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+        }
+    }, [messages]);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!userInput.trim() || isLoading) return;
+
+        const newUserMessage: ChatMessage = {
+            role: 'user',
+            parts: [{ text: userInput }],
+        };
+        
+        const newHistory = [...messages, newUserMessage];
+        setMessages(newHistory);
+        setUserInput('');
+        
+        await streamResponse(newHistory);
+    };
 
     return (
         <div className="flex flex-col h-full animate-fade-in">
@@ -92,11 +109,21 @@ const InteractiveChat: React.FC<InteractiveChatProps> = ({ systemInstruction }) 
                            </div>
                         )}
                         <div className={`max-w-md p-3 rounded-lg ${msg.role === 'user' ? 'bg-brand-accent text-brand-primary' : 'bg-brand-secondary'}`}>
-                            <p className="text-sm whitespace-pre-wrap">{msg.parts[0].text}</p>
+                            {/* Render typing indicator if the message is the model's placeholder during streaming */}
+                            {msg.role === 'model' && msg.parts[0].text === '' && isLoading ? (
+                               <div className="flex items-center justify-center space-x-1">
+                                   <div className="w-2 h-2 bg-brand-text-secondary rounded-full animate-pulse [animation-delay:-0.3s]"></div>
+                                   <div className="w-2 h-2 bg-brand-text-secondary rounded-full animate-pulse [animation-delay:-0.15s]"></div>
+                                   <div className="w-2 h-2 bg-brand-text-secondary rounded-full animate-pulse"></div>
+                               </div>
+                            ) : (
+                               <p className="text-sm whitespace-pre-wrap">{msg.parts[0].text}</p>
+                            )}
                         </div>
                     </div>
                 ))}
-                 {isLoading && messages[messages.length-1]?.role === 'user' && (
+                {/* Show initial loading indicator before any messages appear */}
+                {isLoading && messages.length === 0 && (
                      <div className="flex items-start gap-3 justify-start">
                          <div className="w-8 h-8 flex-shrink-0 bg-brand-accent/10 rounded-full flex items-center justify-center">
                             <LogoIcon className="w-5 h-5 text-brand-accent" />
@@ -109,7 +136,7 @@ const InteractiveChat: React.FC<InteractiveChatProps> = ({ systemInstruction }) 
                              </div>
                          </div>
                      </div>
-                 )}
+                )}
             </div>
 
             {error && !isLoading && <p className="text-red-400 text-sm mt-2 text-center">{error}</p>}
@@ -119,9 +146,10 @@ const InteractiveChat: React.FC<InteractiveChatProps> = ({ systemInstruction }) 
                     type="text"
                     value={userInput}
                     onChange={(e) => setUserInput(e.target.value)}
-                    placeholder="e.g., Explain the key factors in more detail..."
+                    placeholder={isLoading ? "Aura is thinking..." : "e.g., Explain the key factors in more detail..."}
                     className="flex-grow bg-brand-primary border border-brand-border rounded-md p-3 text-brand-text-primary focus:ring-2 focus:ring-brand-accent focus:outline-none transition placeholder:text-gray-500 disabled:opacity-50"
                     disabled={isLoading}
+                    aria-busy={isLoading}
                 />
                 <button
                     type="submit"

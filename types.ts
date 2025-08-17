@@ -67,3 +67,13 @@ export interface ChatMessage {
     role: 'user' | 'model';
     parts: { text: string }[];
 }
+
+// Report History Type
+export interface Report {
+  id: string;
+  timestamp: string;
+  analysisType: AnalysisType;
+  companyName: string;
+  result: PredictionResult;
+  title: string;
+}

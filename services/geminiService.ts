@@ -1,5 +1,5 @@
-import { GoogleGenAI, Type, Chat } from "@google/genai";
-import { AnalysisType, Employee, PredictionResult } from '../types';
+import { GoogleGenAI, Type } from "@google/genai";
+import { AnalysisType, Employee, PredictionResult, ChatMessage } from '../types';
 
 const API_KEY = process.env.API_KEY;
 
@@ -190,9 +190,10 @@ export const refineTextWithAI = async (textToRefine: string, context: RefineCont
 
 // --- CHAT FUNCTIONALITY ---
 
-export const startChat = (systemInstruction: string): Chat => {
-    return ai.chats.create({
+export const getChatStream = (systemInstruction: string, history: ChatMessage[]) => {
+    return ai.models.generateContentStream({
         model,
+        contents: history,
         config: {
             systemInstruction,
             temperature: 0.7,
